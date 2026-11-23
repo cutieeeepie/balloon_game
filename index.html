@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Balloon Flying Championship</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  body { margin: 0; background: #0D47A1; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; color: #111; }
+  #app { width: 100%; max-width: 520px; height: 100dvh; max-height: 860px; position: relative; background: linear-gradient(180deg, #B3E5FC 0%, #1565C0 100%); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.45); }
+  canvas { width: 100%; height: 100%; display: block; }
+  .overlay { position: absolute; inset: 0; background: rgba(13, 71, 161, 0.55); display: flex; justify-content: center; align-items: center; padding: 16px; z-index: 10; }
+  .hidden { display: none !important; }
+  .card { background: #fff; border: 3px solid #0D47A1; border-radius: 18px; padding: 18px; width: 100%; max-width: 440px; box-shadow: 0 8px 0 #1A237E; text-align: center; max-height: 92dvh; overflow-y: auto; }
+  h1 { margin: 0 0 8px; font-size: 20px; color: #0D47A1; }
+  h2 { margin: 0 0 10px; font-size: 15px; color: #1565C0; }
+  p.inst { text-align: left; font-size: 13px; margin: 6px 0; color: #222; line-height: 1.35; }
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .btn { border: none; border-radius: 12px; padding: 12px 10px; font-size: 14px; font-weight: 800; color: #fff; cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,0.25); }
+  .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.25); }
+  .b-green { background: #2E7D32; } .b-teal { background: #00838F; } .b-orange { background: #EF6C00; }
+  .b-blue { background: #1565C0; } .b-red { background: #D32F2F; } .b-navy { background: #0D47A1; }
+  .b-purple { background: #8E24AA; } .b-yellow { background: #FBC02D; color: #111; } .b-gray { background: #888; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; text-align: left; gap: 8px; }
+  .row-info { flex: 1; font-size: 12px; }
+  .row-info b { display: block; font-size: 13px; color: #111; }
+  #hud { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; z-index: 5; }
+  .pill { background: rgba(255,255,255,0.9); color: #0D47A1; font-weight: 800; font-size: 12px; padding: 6px 10px; border-radius: 99px; border: 2px solid #0D47A1; }
+  #menuBtn { pointer-events: auto; background: #D32F2F; color: #fff; border: 2px solid #fff; border-radius: 10px; padding: 6px 12px; font-weight: 800; font-size: 12px; }
+  #windBanner { position: absolute; top: 46px; left: 50%; transform: translateX(-50%); background: #D32F2F; color: #fff; font-weight: 800; font-size: 12px; padding: 4px 12px; border-radius: 99px; z-index: 5; }
+  #centerBanner { position: absolute; top: 44%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.95); color: #0D47A1; border: 3px solid #0D47A1; border-radius: 16px; padding: 14px 20px; font-size: 22px; font-weight: 900; text-align: center; z-index: 6; width: 85%; }
+  #controls { position: absolute; bottom: 10px; left: 10px; right: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 5; }
+  .item-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .item-btn { background: rgba(13, 71, 161, 0.88); color: #fff; border: 2px solid #FFD600; border-radius: 10px; padding: 7px 2px; font-size: 11px; font-weight: 800; }
+  .steer-bar { display: flex; justify-content: space-between; gap: 12px; }
+  .steer-btn { flex: 1; height: 58px; background: rgba(255,255,255,0.88); border: 3px solid #0D47A1; border-radius: 16px; font-size: 24px; font-weight: 900; color: #0D47A1; }
+  .steer-btn:active { background: #FFD600; }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="gameCanvas" width="420" height="720"></canvas>
+  <div id="hud" class="hidden">
+    <div class="pill" id="scorePill">Score: 0/0 | Coins: 100</div>
+    <button id="menuBtn">MENU</button>
+  </div>
+  <div id="windBanner" class="hidden">WIND GUST</div>
+  <div id="centerBanner" class="hidden">GET READY!</div>
+  <div id="controls" class="hidden">
+    <div class="item-bar" id="itemBar">
+      <button class="item-btn" data-item="shield" id="btnShield">Shield (0)</button>
+      <button class="item-btn" data-item="turbo" id="btnTurbo">Turbo (0)</button>
+      <button class="item-btn" data-item="magnet" id="btnMagnet">Magnet (0)</button>
+      <button class="item-btn" data-item="freeze" id="btnFreeze">Freeze (0)</button>
+    </div>
+    <div class="steer-bar" id="steer1P">
+      <button class="steer-btn" id="leftBtn">◀</button>
+      <button class="steer-btn" id="rightBtn">▶</button>
+    </div>
+    <div class="steer-bar hidden" id="steer2P">
+      <button class="steer-btn" id="p1Left">P1 ◀</button>
+      <button class="steer-btn" id="p1Right">P1 ▶</button>
+      <button class="steer-btn" id="p2Left">P2 ◀</button>
+      <button class="steer-btn" id="p2Right">P2 ▶</button>
+    </div>
+  </div>
+  <div id="overlay" class="overlay">
+    <div class="card" id="cardBox"></div>
+  </div>
+</div>
+<script>
+const SAVE_KEY = "balloon_champ_mobile_v1";
+let state = {
+  wins: 0, races: 0, coins: 100,
+  inv: { shield: 0, turbo: 0, magnet: 0, freeze: 0 },
+  skins: ["classic"], skin: "classic",
+  customCols: ["#FF5722", "#FFF176", "#00E5FF"], customImg: "",
+  settings: { bgm: 0.4, sfx: 0.8, lang: "EN" }
+};
+try {
+  const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
+  if (saved) Object.assign(state, saved);
+} catch (e) {}
+const saveState = () => localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+
+const LANGS = ["EN", "HI", "ES"];
+const TEXT = {
+  EN: {
+    title: "BALLOON CHAMPIONSHIP", how: "HOW TO PLAY",
+    inst: ["1. Tap 1P Solo or 2P Split-Touch on one phone!", "2. Hold ◀ / ▶ buttons to steer against wind gusts.", "3. Collect Stars, Coin Gems (+15) & Cyan Speed Rings.", "4. Tap Shield, Turbo, Magnet or Freeze mid-race!"],
+    p1: "1 PLAYER", p2: "2 PLAYERS", shop: "SHOP", set: "SETTINGS", back: "BACK", menu: "MENU",
+    diff: "SELECT DIFFICULTY", easy: "EASY", med: "MEDIUM", hard: "HARD",
+    colT: "CHOOSE YOUR BALLOON", colP1: "P1: CHOOSE BALLOON", colP2: "P2: CHOOSE BALLOON",
+    cols: { red: "RED", blue: "BLUE", green: "GREEN", yellow: "YELLOW" },
+    shopT: "SHOP & SKINS", items: "POWER-UPS", skins: "SKINS", studio: "CUSTOM STUDIO",
+    buy: "BUY", equip: "EQUIP", eq: "EQUIPPED", own: "Owned",
+    bgm: "Music", sfx: "SFX", lang: "Language: English", go: "GO!",
+    win: "YOU WON! {c} crossed first! (+50 Coins)", lose: "WINNER: {c}! (+15 Coins)",
+    p1w: "PLAYER 1 ({c}) WINS! (+50 Coins)", p2w: "PLAYER 2 ({c}) WINS! (+50 Coins)"
+  },
+  HI: {
+    title: "बैलून चैंपियनशिप", how: "कैसे खेलें",
+    inst: ["1. एक ही फ़ोन पर 1P या 2P खेलें!", "2. हवा में मुड़ने के लिए ◀ / ▶ दबाए रखें।", "3. सितारे, सिक्के (+15) और स्पीड रिंग पकड़ें।", "4. दौड़ में ढाल, टर्बो, चुंबक या फ्रीज़ टैप करें!"],
+    p1: "1 खिलाड़ी", p2: "2 खिलाड़ी", shop: "दुकान", set: "सेटिंग्स", back: "वापस", menu: "मेनू",
+    diff: "कठिनाई चुनें", easy: "आसान", med: "मध्यम", hard: "कठिन",
+    colT: "गुब्बारा चुनें", colP1: "P1: गुब्बारा चुनें", colP2: "P2: गुब्बारा चुनें",
+    cols: { red: "लाल", blue: "नीला", green: "हरा", yellow: "पीला" },
+    shopT: "दुकान और स्किन्स", items: "पावर-अप्स", skins: "स्किन्स", studio: "कस्टम स्टूडियो",
+    buy: "खरीदें", equip: "चुनें", eq: "चयनित", own: "पास हैं",
+    bgm: "संगीत", sfx: "ध्वनि", lang: "भाषा: हिन्दी", go: "शुरू!",
+    win: "आप जीत गए! {c} सबसे पहले पहुँचा! (+50 सिक्के)", lose: "विजेता: {c}! (+15 सिक्के)",
+    p1w: "खिलाड़ी 1 ({c}) जीता! (+50 सिक्के)", p2w: "खिलाड़ी 2 ({c}) जीता! (+50 सिक्के)"
+  },
+  ES: {
+    title: "CAMPEONATO DE GLOBOS", how: "CÓMO JUGAR",
+    inst: ["1. ¡Juega 1P Solo o 2P en el mismo teléfono!", "2. Mantén ◀ / ▶ para girar contra el viento.", "3. Recoge estrellas, gemas (+15) y aros cian.", "4. ¡Toca Escudo, Turbo, Imán o Hielo en carrera!"],
+    p1: "1 JUGADOR", p2: "2 JUGADORES", shop: "TIENDA", set: "AJUSTES", back: "VOLVER", menu: "MENÚ",
+    diff: "DIFICULTAD", easy: "FÁCIL", med: "MEDIO", hard: "DIFÍCIL",
+    colT: "ELIGE TU GLOBO", colP1: "J1: ELIGE GLOBO", colP2: "J2: ELIGE GLOBO",
+    cols: { red: "ROJO", blue: "AZUL", green: "VERDE", yellow: "AMARILLO" },
+    shopT: "TIENDA Y SKINS", items: "OBJETOS", skins: "SKINS", studio: "ESTUDIO CUSTOM",
+    buy: "COMPRAR", equip: "USAR", eq: "EN USO", own: "Tienes",
+    bgm: "Música", sfx: "Efectos", lang: "Idioma: Español", go: "¡YA!",
+    win: "¡GANASTE! ¡{c} cruzó primero! (+50 Monedas)", lose: "GANADOR: {c}. (+15 Monedas)",
+    p1w: "¡JUGADOR 1 ({c}) GANA! (+50 Monedas)", p2w: "¡JUGADOR 2 ({c}) GANA! (+50 Monedas)"
+  }
+};
+const T = k => TEXT[state.settings.lang][k];
+
+// Web Audio Chiptune Synthesizer
+let audioCtx = null, bgmTimer = null;
+function playTone(freq, dur, vol, type = "square") {
+  if (vol <= 0.01) return;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+  osc.type = type; osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol * 0.15, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + dur);
+}
+function sfx(ev) {
+  const v = state.settings.sfx;
+  if (ev === "beep") playTone(660, 0.09, v, "sine");
+  else if (ev === "go") { playTone(523, 0.1, v); setTimeout(() => playTone(784, 0.2, v), 90); }
+  else if (ev === "boost") { playTone(587, 0.08, v, "triangle"); setTimeout(() => playTone(880, 0.15, v, "triangle"), 70); }
+  else if (ev === "bird") playTone(160, 0.25, v, "sawtooth");
+  else if (ev === "win") [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => playTone(f, 0.16, v), i * 100));
+  else if (ev === "lose") [392, 330, 261].forEach((f, i) => setTimeout(() => playTone(f, 0.18, v, "sawtooth"), i * 130));
+}
+function startBgm() {
+  stopBgm();
+  const notes =;
+  let idx = 0;
+  bgmTimer = setInterval(() => {
+    playTone(notes[idx % notes.length], 0.15, state.settings.bgm * 0.6, "square");
+    idx++;
+  }, 210);
+}
+function stopBgm() { if (bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; } }
+
+const overlay = document.getElementById("overlay"), card = document.getElementById("cardBox");
+let shopTab = "items", sel = { mode: 1, diff: "med", p1: "red", p2: "" };
+
+function showStart() {
+  overlay.classList.remove("hidden");
+  document.getElementById("hud").classList.add("hidden");
+  document.getElementById("controls").classList.add("hidden");
+  card.innerHTML = `<h1>${T("title")}</h1><h2>${T("how")}</h2>` +
+    T("inst").map(l => `<p class="inst">${l}</p>`).join("") +
+    `<div class="btn-grid">
+      <button class="btn b-green" onclick="pickMode(1)">${T("p1")}</button>
+      <button class="btn b-teal" onclick="pickMode(2)">${T("p2")}</button>
+      <button class="btn b-orange" onclick="showShop()">${T("shop")} (${state.coins})</button>
+      <button class="btn b-blue" onclick="showSettings()">${T("set")}</button>
+    </div>`;
+}
+function pickMode(m) { sfx("beep"); sel.mode = m; showDiff(); }
+function showDiff() {
+  card.innerHTML = `<h1>${T("diff")}</h1><div class="btn-grid" style="grid-template-columns:1fr;">
+    <button class="btn b-green" onclick="pickDiff('easy')">${T("easy")}</button>
+    <button class="btn b-orange" onclick="pickDiff('med')">${T("med")}</button>
+    <button class="btn b-red" onclick="pickDiff('hard')">${T("hard")}</button>
+    <button class="btn b-navy" onclick="showStart()">${T("back")}</button>
+  </div>`;
+}
+function pickDiff(d) { sfx("beep"); sel.diff = d; showCol(1); }
+function showCol(pl) {
+  const cBtn = { red: "b-red", blue: "b-blue", green: "b-green", yellow: "b-yellow" };
+  card.innerHTML = `<h1>${sel.mode === 1 ? T("colT") : (pl === 1 ? T("colP1") : T("colP2"))}</h1><div class="btn-grid">` +
+    ["red", "blue", "green", "yellow"].map(c => (pl === 2 && c === sel.p1)
+      ? `<button class="btn b-gray" onclick="sfx('bird')">P1</button>`
+      : `<button class="btn ${cBtn[c]}" onclick="pickCol('${c}', ${pl})">${T("cols")[c]}</button>`).join("") +
+    `</div><button class="btn b-navy" style="width:100%;margin-top:10px" onclick="${pl === 1 ? 'showDiff()' : 'showCol(1)'}">${T("back")}</button>`;
+}
+function pickCol(c, pl) {
+  sfx("beep");
+  if (pl === 1) { sel.p1 = c; sel.p2 = ""; sel.mode === 2 ? showCol(2) : startRace(); }
+  else { sel.p2 = c; startRace(); }
+}
+function showShop() {
+  let rows = "";
+  if (shopTab === "items") {
+    [["shield", "Shield (Blocks 1 bird)", 30], ["turbo", "Turbo (+Upward surge)", 40], ["magnet", "Magnet (5s star pull)", 50], ["freeze", "Ice Freeze (3s rival stop)", 60]].forEach(([k, nm, cost]) => {
+      rows += `<div class="row"><div class="row-info"><b>${nm}</b>${T("own")}: ${state.inv[k] || 0}</div>
+        <button class="btn ${state.coins >= cost ? 'b-green' : 'b-gray'}" onclick="buyItem('${k}',${cost})">${T("buy")} (${cost})</button></div>`;
+    });
+  } else {
+    [["classic", "Classic Striped", 0], ["neon", "Neon Cyber", 120], ["gold", "Royal Gold", 200], ["galaxy", "Galaxy Star", 300]].forEach(([k, nm, cost]) => {
+      const btn = state.skin === k ? `<button class="btn b-blue">${T("eq")}</button>`
+        : (state.skins.includes(k) ? `<button class="btn b-teal" onclick="eqSkin('${k}')">${T("equip")}</button>`
+        : `<button class="btn ${state.coins >= cost ? 'b-green' : 'b-gray'}" onclick="buySkin('${k}',${cost})">${T("buy")} (${cost})</button>`);
+      rows += `<div class="row"><div class="row-info"><b>${nm}</b></div>${btn}</div>`;
+    });
+  }
+  card.innerHTML = `<h1>${T("shopT")} (${state.coins})</h1>
+    <div class="btn-grid" style="margin-top:4px;margin-bottom:8px">
+      <button class="btn ${shopTab === 'items' ? 'b-orange' : 'b-gray'}" onclick="shopTab='items';sfx('beep');showShop()">${T("items")}</button>
+      <button class="btn ${shopTab === 'skins' ? 'b-orange' : 'b-gray'}" onclick="shopTab='skins';sfx('beep');showShop()">${T("skins")}</button>
+    </div>${rows}
+    <div class="btn-grid"><button class="btn b-purple" onclick="sfx('beep');showStudio()">${T("studio")}</button>
+    <button class="btn b-navy" onclick="sfx('beep');showStart()">${T("back")}</button></div>`;
+}
+function buyItem(k, cost) { if (state.coins >= cost) { state.coins -= cost; state.inv[k] = (state.inv[k] || 0) + 1; saveState(); sfx("boost"); showShop(); } else sfx("bird"); }
+function buySkin(k, cost) { if (state.coins >= cost) { state.coins -= cost; state.skins.push(k); state.skin = k; saveState(); sfx("win"); showShop(); } else sfx("bird"); }
+function eqSkin(k) { state.skin = k; saveState(); sfx("beep"); showShop(); }
+
+const SWATCHES = ["#E53935", "#1E88E5", "#43A047", "#FDD835", "#8E24AA", "#FF6D00", "#00E5FF", "#1A1A2E", "#FFFFFF", "#FF4081"];
+function showStudio() {
+  const labels = ["1. Body Color", "2. Stripe Color", "3. Outline Color"];
+card.innerHTML = <h1>${T("studio")}</h1> + labels.map((l, i) =>  <div class="row"><div class="row-info"><b>${l}</b></div> <button class="btn" style="background:${state.customCols[i]};color:#111;border:2px solid #111" onclick="cycleCol(${i})">CHANGE</button></div>).join("") +
+`
+EQUIP DESIGN
+UPLOAD PHOTO
+${T("back")}; } function cycleCol(i) { sfx("beep"); const idx = SWATCHES.indexOf(state.customCols[i]); state.customCols[i] = SWATCHES[(idx + 1) % SWATCHES.length]; saveState(); showStudio(); } function uploadPhoto(e) { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = ev => { const img = new Image(); img.onload = () => { const c = document.createElement("canvas"); c.width = 64; c.height = 76; c.getContext("2d").drawImage(img, 0, 0, 64, 76); state.customImg = c.toDataURL("image/png"); state.skin = "custom_img"; saveState(); sfx("win"); showStudio(); }; img.src = ev.target.result; }; reader.readAsDataURL(file); } function showSettings() { card.innerHTML = ${T("set")}
+${T("bgm")}: ${Math.round(state.settings.bgm * 100)}%
+-+
+${T("sfx")}: ${Math.round(state.settings.sfx * 100)}%
+-+
+${T("lang")}
+${T("back")}`;
+}
+function adjVol(k, d) { state.settings[k] = Math.max(0, Math.min(1, Math.round((state.settings[k] + d) * 10) / 10)); saveState(); if (k === "sfx") sfx("beep"); showSettings(); }
+const canvas = document.getElementById("gameCanvas"), ctx = canvas.getContext("2d");
+const COLS = ["red", "blue", "green", "yellow"], START_X =;
+const SKIN_PAL = {
+  classic: { red: ["#E53935", "#FFCDD2", "#222"], blue: ["#1E88E5", "#BBDEFB", "#222"], green: ["#43A047", "#C8E6C9", "#222"], yellow: ["#FDD835", "#FFF9C4", "#222"] },
+  neon: { red: ["#1A1A2E", "#FF1744", "#00E5FF"], blue: ["#1A1A2E", "#00E5FF", "#FF1744"], green: ["#1A1A2E", "#00E676", "#FFEA00"], yellow: ["#1A1A2E", "#FFEA00", "#D500F9"] },
+  gold: { red: ["#B71C1C", "#FFD700", "#FFAB00"], blue: ["#0D47A1", "#FFD700", "#FFAB00"], green: ["#1B5E20", "#FFD700", "#FFAB00"], yellow: ["#F57F17", "#FFF59D", "#FFD700"] },
+  galaxy: { red: ["#311B92", "#FF4081", "#80D8FF"], blue: ["#1A237E", "#00E5FF", "#EA80FC"], green: ["#004D40", "#69F0AE", "#80D8FF"], yellow: ["#4A148C", "#FFD740", "#80D8FF"] }
+};
+
+let customImgObj = new Image(), inRace = false, rafId = null;
+let balloons = [], birds = [], stars = [], gems = [], rings = [];
+let clouds = Array.from({ length: 4 }, () => ({ x: Math.random() * 420, y: 80 + Math.random() * 180, sp: 0.25 + Math.random() * 0.4, sc: 0.8 + Math.random() * 0.4 }));
+let fx = { shield: false, magnet: 0, freeze: 0 }, wind = { vx: 0, timer: 0 }, tk = 0, frame = 0;
+let keys = { A: false, D: false, L: false, R: false };
+
+function bindHold(id, k) {
+  const el = document.getElementById(id);
+  el.addEventListener("pointerdown", e => { e.preventDefault(); keys[k] = true; });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => el.addEventListener(ev, () => keys[k] = false));
+}
+bindHold("leftBtn", "L"); bindHold("rightBtn", "R");
+bindHold("p1Left", "A"); bindHold("p1Right", "D");
+bindHold("p2Left", "L"); bindHold("p2Right", "R");
+
+window.addEventListener("keydown", e => {
+  if (e.key === "a" || e.key === "A") keys.A = true;
+  if (e.key === "d" || e.key === "D") keys.D = true;
+  if (e.key === "ArrowLeft") keys.L = true;
+  if (e.key === "ArrowRight") keys.R = true;
+});
+window.addEventListener("keyup", e => {
+  if (e.key === "a" || e.key === "A") keys.A = false;
+  if (e.key === "d" || e.key === "D") keys.D = false;
+  if (e.key === "ArrowLeft") keys.L = false;
+  if (e.key === "ArrowRight") keys.R = false;
+});
+
+document.querySelectorAll(".item-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (!inRace) return;
+    const it = btn.dataset.item;
+    if ((state.inv[it] || 0) <= 0) return;
+    if (it === "shield" && !fx.shield) { state.inv.shield--; fx.shield = true; sfx("go"); }
+    else if (it === "turbo") { state.inv.turbo--; const p = balloons.find(b => b.c === sel.p1); if (p) p.y = Math.max(95, p.y - 85); sfx("boost"); }
+    else if (it === "magnet" && fx.magnet <= 0) { state.inv.magnet--; fx.magnet = 240; sfx("boost"); }
+    else if (it === "freeze" && fx.freeze <= 0) { state.inv.freeze--; fx.freeze = 150; sfx("go"); }
+    saveState(); updHud();
+  });
+});
+
+document.getElementById("menuBtn").addEventListener("click", () => {
+  inRace = false; stopBgm(); cancelAnimationFrame(rafId);
+  document.getElementById("windBanner").classList.add("hidden");
+  document.getElementById("centerBanner").classList.add("hidden");
+  sfx("beep"); showStart();
+});
+
+function updHud() {
+  document.getElementById("scorePill").textContent = `Score: ${state.wins}/${state.races} | Coins: ${state.coins}`;
+  document.getElementById("btnShield").textContent = `Shield (${state.inv.shield || 0})${fx.shield ? "✓" : ""}`;
+  document.getElementById("btnTurbo").textContent = `Turbo (${state.inv.turbo || 0})`;
+  document.getElementById("btnMagnet").textContent = `Magnet (${state.inv.magnet || 0})${fx.magnet > 0 ? "✓" : ""}`;
+  document.getElementById("btnFreeze").textContent = `Freeze (${state.inv.freeze || 0})${fx.freeze > 0 ? "✓" : ""}`;
+}
+
+function startRace() {
+  overlay.classList.add("hidden");
+  document.getElementById("hud").classList.remove("hidden");
+  document.getElementById("controls").classList.remove("hidden");
+  document.getElementById("steer1P").classList.toggle("hidden", sel.mode === 2);
+  document.getElementById("steer2P").classList.toggle("hidden", sel.mode === 1);
+  if (state.customImg) customImgObj.src = state.customImg;
+
+  fx = { shield: false, magnet: 0, freeze: 0 }; wind = { vx: 0, timer: 0 };
+  keys = { A: false, D: false, L: false, R: false };
+  balloons = COLS.map((c, i) => ({ c, x: START_X[i], y: 560, baseX: START_X[i] }));
+  const bCnt = sel.diff === "easy" ? 1 : (sel.diff === "hard" ? 4 : 2);
+  const bSpd = sel.diff === "easy" ? [2.2, 3.8] : (sel.diff === "hard" ? [4.5, 7.5] : [3.2, 5.5]);
+  birds = Array.from({ length: bCnt }, (_, i) => ({ x: -40 - i * 130, y: 150 + Math.random() * 280, sp: bSpd }));
+  stars = Array.from({ length: 3 }, () => ({ x: 40 + Math.random() * 340, y: 160 + Math.random() * 280, ang: 0 }));
+  gems = Array.from({ length: 2 }, () => ({ x: 40 + Math.random() * 340, y: 160 + Math.random() * 280, ang: 0 }));
+  rings = Array.from({ length: 2 }, () => ({ x: 50 + Math.random() * 320, y: 180 + Math.random() * 240 }));
+  updHud();
+
+  const ban = document.getElementById("centerBanner");
+  ban.classList.remove("hidden");
+  const steps = [sel.mode === 1 ? `YOU: ${T("cols")[sel.p1]}` : `P1: ${T("cols")[sel.p1]} vs P2: ${T("cols")[sel.p2]}`, "3", "2", "1", T("go")];
+  let idx = 0;
+  function nextStep() {
+    if (idx >= steps.length) {
+      ban.classList.add("hidden"); inRace = true; startBgm(); loop(); return;
+    }
+    ban.textContent = steps[idx];
+    if (steps[idx] === T("go")) sfx("go");
+    else if (["3", "2", "1"].includes(steps[idx])) sfx("beep");
+    idx++; setTimeout(nextStep, 550);
+  }
+  nextStep();
+}
+
+function drawScene() {
+  const grad = ctx.createLinearGradient(0, 0, 0, 720);
+  grad.addColorStop(0, "#B3E5FC"); grad.addColorStop(1, "#1565C0");
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, 420, 720);
+
+  // Sun & Hills
+  ctx.fillStyle = "#FFF59D"; ctx.beginPath(); ctx.arc(68, 105, 34, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#FDD835"; ctx.beginPath(); ctx.arc(68, 105, 25, 0, Math.PI * 2); ctx.fill();
+  [["#43A047", 95, 760, 175], ["#388E3C", 335, 765, 190], ["#2E7D32", 210, 770, 165]].forEach(([col, hx, hy, hr]) => {
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(hx, hy, hr, 0, Math.PI * 2); ctx.fill();
+  });
+
+  // Drifting Clouds
+  clouds.forEach(cl => {
+    cl.x += cl.sp; if (cl.x > 460) cl.x = -60;
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    [[0, 0, 18], [16, -4, 21], [34, 0, 16]].forEach(([dx, dy, r]) => {
+      ctx.beginPath(); ctx.arc(cl.x + dx * cl.sc, cl.y + dy * cl.sc, r * cl.sc, 0, Math.PI * 2); ctx.fill();
+    });
+  });
+
+  // Finish Line & Start Line
+  for (let i = 0; i < 28; i++) {
+    ctx.fillStyle = i % 2 === 0 ? "#fff" : "#212121";
+    ctx.fillRect(i * 15, 88, 15, 14);
+  }
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
+  ctx.beginPath(); ctx.moveTo(0, 585); ctx.lineTo(420, 585); ctx.stroke(); ctx.setLineDash([]);
+
+  // Cyan Speed Rings
+  rings.forEach(rg => {
+    ctx.strokeStyle = "#00E5FF"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.ellipse(rg.x, rg.y, 24, 10, 0, 0, Math.PI * 2); ctx.stroke();
+  });
+
+  // Coin Gems
+  gems.forEach(gm => {
+    ctx.save(); ctx.translate(gm.x, gm.y); ctx.rotate(gm.ang);
+    ctx.fillStyle = "#FF6D00"; ctx.strokeStyle = "#FFF59D"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(9, 0); ctx.lineTo(0, 12); ctx.lineTo(-9, 0); ctx.closePath();
+    ctx.fill(); ctx.stroke(); ctx.restore();
+  });
+
+  // Gold Stars
+  stars.forEach(st => {
+    ctx.save(); ctx.translate(st.x, st.y); ctx.rotate(st.ang);
+    ctx.fillStyle = "#FFD600"; ctx.strokeStyle = "#F57F17"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 === 0 ? 14 : 6, a = (i * Math.PI) / 5 - Math.PI / 2;
+      i === 0 ? ctx.moveTo(r * Math.cos(a), r * Math.sin(a)) : ctx.lineTo(r * Math.cos(a), r * Math.sin(a));
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+  });
+
+  // Flapping Birds
+  const wingUp = Math.floor(frame / 6) % 2 === 0;
+  birds.forEach(bd => {
+    ctx.fillStyle = "#263238"; ctx.beginPath();
+    ctx.moveTo(bd.x + 12, bd.y); ctx.lineTo(bd.x - 10, bd.y + 4);
+    ctx.lineTo(bd.x - 4, bd.y + (wingUp ? -14 : 12)); ctx.lineTo(bd.x - 14, bd.y);
+    ctx.closePath(); ctx.fill();
+  });
+
+  // Balloons
+  const humans = sel.mode === 1 ? [sel.p1] : [sel.p1, sel.p2];
+  balloons.forEach(b => {
+    const isHuman = humans.includes(b.c);
+    if (isHuman && state.skin === "custom_img" && customImgObj.complete && customImgObj.naturalWidth > 0) {
+      ctx.drawImage(customImgObj, b.x - 24, b.y - 30, 48, 58);
+    } else {
+      const pal = (isHuman && state.skin === "custom_vec") ? state.customCols : (SKIN_PAL[isHuman ? state.skin : "classic"] || SKIN_PAL.classic)[b.c];
+      ctx.strokeStyle = "#5D4037"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(b.x - 7, b.y + 16); ctx.lineTo(b.x - 5, b.y + 24);
+      ctx.moveTo(b.x + 7, b.y + 16); ctx.lineTo(b.x + 5, b.y + 24); ctx.stroke();
+      ctx.fillStyle = "#8D6E63"; ctx.fillRect(b.x - 7, b.y + 24, 14, 10);
+
+      ctx.fillStyle = pal[0]; ctx.strokeStyle = pal[2]; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(b.x, b.y - 4, 21, 25, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = pal[1];
+      ctx.beginPath(); ctx.ellipse(b.x, b.y - 4, 9, 25, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    if (isHuman) {
+      ctx.strokeStyle = b.c === sel.p1 ? "#FFD600" : "#00E5FF"; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(b.x, b.y, 33, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (b.c === sel.p1 && fx.shield) {
+      ctx.strokeStyle = "#00E5FF"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(b.x, b.y, 39, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (!isHuman && fx.freeze > 0) {
+      ctx.strokeStyle = "#80DEEA"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(b.x, b.y, 32, 0, Math.PI * 2); ctx.stroke();
+    }
+  });
+}
+
+function loop() {
+  if (!inRace) return;
+  tk += 0.12; frame++;
+
+// Wind Gusts
+const wb = document.getElementById("windBanner");
+if (wind.timer <= 0 && Math.random() < 0.008) {
+wind.vx = Math.random() < 0.5 ? -2.2 : 2.2; wind.timer = 110;
+wb.textContent = wind.vx < 0 ? "WIND GUST ◀◀" : "WIND GUST ▶▶"; wb.classList.remove("hidden");
+} else if (wind.timer > 0) {
+wind.timer--; if (wind.timer === 0) { wind.vx = 0; wb.classList.add("hidden"); }
+}
+// Animate Collectibles
+const p1b = balloons.find(b => b.c === sel.p1);
+stars.forEach((st, i) => {
+st.ang += 0.07; st.x -= 1.1; st.y += Math.sin(tk + i) * 0.9;
+if (st.x < -20) { st.x = 440; st.y = 160 + Math.random() * 280; }
+if (fx.magnet > 0 && p1b) {
+const a = Math.atan2(p1b.y - st.y, p1b.x - st.x);
+st.x += Math.cos(a) * 5.5; st.y += Math.sin(a) * 5.5;
+}
+});
+gems.forEach(gm => { gm.ang -= 0.08; gm.x += 1.3; if (gm.x > 440) { gm.x = -20; gm.y = 160 + Math.random() * 280; } });
+rings.forEach((rg, i) => { rg.y += Math.cos(tk + i) * 1.1; });
+if (fx.magnet > 0) fx.magnet--;
+if (fx.freeze > 0) fx.freeze--;
+if (frame % 10 === 0) updHud();
+// Player Steering
+const p2b = sel.mode === 2 ? balloons.find(b => b.c === sel.p2) : null;
+if (sel.mode === 1 && p1b) {
+if (keys.A || keys.L) p1b.x = Math.max(28, p1b.x - 6.5);
+if (keys.D || keys.R) p1b.x = Math.min(392, p1b.x + 6.5);
+} else {
+if (p1b) { if (keys.A) p1b.x = Math.max(28, p1b.x - 6.5); if (keys.D) p1b.x = Math.min(392, p1b.x + 6.5); }
+if (p2b) { if (keys.L) p2b.x = Math.max(28, p2b.x - 6.5); if (keys.R) p2b.x = Math.min(392, p2b.x + 6.5); }
+}
+if (wind.vx !== 0) {
+[p1b, p2b].filter(Boolean).forEach(hb => hb.x = Math.max(28, Math.min(392, hb.x + wind.vx)));
+}
+// Birds & Balloons Physics
+birds.forEach(bd => {
+bd.x += bd.sp[0] + Math.random() * (bd.sp[1] - bd.sp[0]);
+if (bd.x > 445) { bd.x = -30; bd.y = 150 + Math.random() * 280; }
+});
+const humans = sel.mode === 1 ? [sel.p1] : [sel.p1, sel.p2];
+let winner = "";
+balloons.forEach((b, i) => {
+const isHuman = humans.includes(b.c);
+if (!isHuman && fx.freeze > 0) return;
+let vy = -(1.1 + Math.random() * 3.2);
+birds.forEach(bd => {
+if (Math.hypot(b.x - bd.x, b.y - bd.y) < 28) {
+if (b.c === sel.p1 && fx.shield) { fx.shield = false; bd.x = -40; sfx("beep"); }
+else { vy += 24; if (isHuman) sfx("bird"); }
+}
+});
+stars.forEach(st => {
+if (Math.hypot(b.x - st.x, b.y - st.y) < 30) {
+vy -= 36; st.x = 440; st.y = 160 + Math.random() * 280; if (isHuman) sfx("boost");
+}
+});
+gems.forEach(gm => {
+if (Math.hypot(b.x - gm.x, b.y - gm.y) < 28) {
+gm.x = -30; gm.y = 160 + Math.random() * 280;
+if (isHuman) { state.coins += 15; saveState(); updHud(); sfx("beep"); }
+}
+});
+rings.forEach(rg => {
+if (Math.hypot(b.x - rg.x, b.y - rg.y) < 32) {
+vy -= 55; rg.x = 50 + Math.random() * 320; rg.y = 180 + Math.random() * 240;
+if (isHuman) sfx("go");
+}
+});
+b.y = Math.min(570, b.y + vy);
+if (!isHuman) b.x = Math.max(28, Math.min(392, b.baseX + Math.sin(tk + i) * 14 + wind.vx * 3));
+if (b.y <= 98 && !winner) winner = b.c;
+});
+drawScene();
+if (winner) {
+inRace = false; stopBgm(); wb.classList.add("hidden"); state.races++;
+let msg = "";
+if (sel.mode === 2 && humans.includes(winner)) {
+state.wins++; state.coins += 50; msg = T(winner === sel.p1 ? "p1w" : "p2w").replace("{c}", T("cols")[winner]); sfx("win");
+} else if (winner === sel.p1) {
+state.wins++; state.coins += 50; msg = T("win").replace("{c}", T("cols")[winner]); sfx("win");
+} else {
+state.coins += 15; msg = T("lose").replace("{c}", T("cols")[winner]); sfx("lose");
+}
+saveState(); updHud();
+const ban = document.getElementById("centerBanner");
+ban.textContent = msg; ban.classList.remove("hidden");
+setTimeout(() => { ban.classList.add("hidden"); overlay.classList.remove("hidden"); showDiff(); }, 2200);
+return;
+}
+rafId = requestAnimationFrame(loop);
+}
+showStart();
